@@ -5,9 +5,19 @@
 
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { MapContainer } from '@/components/maps/MapContainer';
+import React, { useEffect, useState, Suspense } from 'react';
+import dynamic from 'next/dynamic';
 import { TimeSeriesChart } from '@/components/charts/TimeSeriesChart';
+
+// Dynamic import for MapContainer to avoid SSR issues with Leaflet
+const MapContainer = dynamic(
+  () => import('@/components/maps/MapContainer').then((mod) => mod.MapContainer),
+  { ssr: false, loading: () => (
+    <div className="w-full h-full min-h-[400px] bg-gray-100 rounded-lg flex items-center justify-center">
+      <div className="text-gray-500">Loading map...</div>
+    </div>
+  )}
+);
 import type { AirQualityMeasurement } from '@/types/air-quality';
 import type { WeatherForecast } from '@/types/weather';
 import { getAQIColor, getAQICategory } from '@/lib/api/openaq';
