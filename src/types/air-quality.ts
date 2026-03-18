@@ -36,6 +36,8 @@ export interface AirQualityMeasurement {
   readonly locationId: string;
   readonly locationName: string;
   readonly coordinates: Coordinates;
+  readonly city: string;
+  readonly country: string;
   readonly timestamp: string;
   readonly aqi: number;
   readonly pm25: number | null;

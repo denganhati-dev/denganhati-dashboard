@@ -87,6 +87,8 @@ function transformOpenAQResult(
     locationId: result.locationId,
     locationName: result.location,
     coordinates,
+    city: result.city,
+    country: result.country,
     timestamp: result.date.utc,
     aqi,
     pm25,
