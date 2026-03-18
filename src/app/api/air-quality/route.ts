@@ -1,21 +1,21 @@
 /**
  * @fileoverview Air Quality API Route
- * Next.js API route for proxying OpenAQ requests with caching
+ * Next.js API route for fetching air quality data from OpenAQ v3 API
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import type { AirQualityMeasurement } from '@/types/air-quality';
 
-const OPENAQ_BASE_URL = 'https://api.openaq.org/v2';
+const OPENAQ_BASE_URL = 'https://api.openaq.org/v3';
 
 // Simple in-memory cache (5 minutes)
 const cache = new Map<string, { data: AirQualityMeasurement[]; timestamp: number }>();
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 /**
- * Calculate AQI from PM2.5 value
- * @param pm25 - PM2.5 concentration
- * @returns AQI value
+ * Calculate AQI from PM2.5 value using US EPA standards
+ * @param pm25 - PM2.5 concentration in μg/m³
+ * @returns AQI value (0-500)
  */
 function calculateAQIFromPM25(pm25: number): number {
   if (pm25 <= 12.0) {
@@ -40,21 +40,32 @@ function calculateAQIFromPM25(pm25: number): number {
 }
 
 /**
- * Transform OpenAQ result to AirQualityMeasurement
+ * Transform OpenAQ v3 result to AirQualityMeasurement
  */
 function transformResult(result: {
-  locationId: string;
-  location: string;
-  parameter: string;
-  value: number;
-  date: { utc: string; local: string };
-  unit: string;
-  coordinates: { latitude: number; longitude: number };
-  country: string;
-  city: string;
-}): AirQualityMeasurement {
-  const coordinates: [number, number] = [result.coordinates.latitude, result.coordinates.longitude];
+  id: string;
+  name: string;
+  locality?: string;
+  timezone?: string;
+  country?: { id: string; name: string };
+  owner?: { id: string; name: string };
+  coordinates?: { lat: number; lon: number };
+  sensors?: Array<{
+    id: string;
+    name: string;
+    parameter?: { id: string; name: string; units: string };
+    latest?: {
+      datetime: string;
+      value: number;
+    };
+  }>;
+}): AirQualityMeasurement | null {
+  if (!result.coordinates || !result.sensors) {
+    return null;
+  }
 
+  const coordinates: [number, number] = [result.coordinates.lat, result.coordinates.lon];
+  
   let aqi = 0;
   let pm25: number | null = null;
   let pm10: number | null = null;
@@ -62,37 +73,56 @@ function transformResult(result: {
   let no2: number | null = null;
   let so2: number | null = null;
   let co: number | null = null;
+  let latestTimestamp = new Date().toISOString();
 
-  switch (result.parameter.toLowerCase()) {
-    case 'pm25':
-    case 'pm2.5':
-      pm25 = result.value;
-      aqi = calculateAQIFromPM25(result.value);
-      break;
-    case 'pm10':
-      pm10 = result.value;
-      break;
-    case 'o3':
-      o3 = result.value;
-      break;
-    case 'no2':
-      no2 = result.value;
-      break;
-    case 'so2':
-      so2 = result.value;
-      break;
-    case 'co':
-      co = result.value;
-      break;
+  // Process sensors
+  for (const sensor of result.sensors) {
+    if (!sensor.latest) continue;
+    
+    const paramName = sensor.parameter?.name?.toLowerCase() ?? '';
+    const value = sensor.latest.value;
+    latestTimestamp = sensor.latest.datetime;
+
+    switch (paramName) {
+      case 'pm25':
+      case 'pm2.5':
+        pm25 = value;
+        aqi = calculateAQIFromPM25(value);
+        break;
+      case 'pm10':
+        pm10 = value;
+        break;
+      case 'o3':
+      case 'ozone':
+        o3 = value;
+        break;
+      case 'no2':
+      case 'nitrogen dioxide':
+        no2 = value;
+        break;
+      case 'so2':
+      case 'sulfur dioxide':
+        so2 = value;
+        break;
+      case 'co':
+      case 'carbon monoxide':
+        co = value;
+        break;
+    }
+  }
+
+  // Only return if we have at least one measurement
+  if (pm25 === null && pm10 === null && o3 === null && no2 === null && so2 === null && co === null) {
+    return null;
   }
 
   return {
-    locationId: result.locationId,
-    locationName: result.location,
+    locationId: result.id,
+    locationName: result.name,
     coordinates,
-    city: result.city,
-    country: result.country,
-    timestamp: result.date.utc,
+    city: result.locality ?? result.owner?.name ?? 'Unknown',
+    country: result.country?.name ?? 'Unknown',
+    timestamp: latestTimestamp,
     aqi,
     pm25,
     pm10,
@@ -105,13 +135,14 @@ function transformResult(result: {
 
 /**
  * GET handler for air quality data
+ * Uses OpenAQ v3 API - /locations endpoint
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
     const { searchParams } = new URL(request.url);
     const country = searchParams.get('country');
     const city = searchParams.get('city');
-    const limit = searchParams.get('limit') ?? '100';
+    const limit = searchParams.get('limit') ?? '50';
 
     // Create cache key
     const cacheKey = `${country ?? 'all'}-${city ?? 'all'}-${limit}`;
@@ -122,22 +153,38 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ data: cached.data, cached: true });
     }
 
-    // Build OpenAQ URL
+    // Build OpenAQ v3 URL - using /locations endpoint with sensors
     const params = new URLSearchParams();
     params.append('limit', limit);
-    if (country) params.append('country', country);
-    if (city) params.append('city', city);
-
-    const url = `${OPENAQ_BASE_URL}/latest?${params.toString()}`;
+    params.append('sensors', 'true'); // Include sensor data
     
-    const response = await fetch(url);
+    if (country) {
+      params.append('countries_id', country);
+    }
+    if (city) {
+      params.append('locality', city);
+    }
+
+    const url = `${OPENAQ_BASE_URL}/locations?${params.toString()}`;
+    
+    const response = await fetch(url, {
+      headers: {
+        'Accept': 'application/json',
+      },
+    });
     
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error('OpenAQ API error:', response.status, errorText);
       throw new Error(`OpenAQ API error: ${response.status}`);
     }
 
     const data = await response.json();
-    const measurements: AirQualityMeasurement[] = data.results.map(transformResult);
+    
+    // Transform results
+    const measurements: AirQualityMeasurement[] = (data.results ?? [])
+      .map(transformResult)
+      .filter((m: AirQualityMeasurement | null): m is AirQualityMeasurement => m !== null);
 
     // Update cache
     cache.set(cacheKey, { data: measurements, timestamp: Date.now() });
@@ -146,7 +193,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   } catch (error) {
     console.error('Air quality API error:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch air quality data' },
+      { error: 'Failed to fetch air quality data', details: String(error) },
       { status: 500 }
     );
   }

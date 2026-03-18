@@ -1,16 +1,15 @@
 /**
  * @fileoverview OpenAQ API Client
- * Functions for fetching air quality data from OpenAQ API
+ * Functions for fetching air quality data from OpenAQ v3 API
  */
 
 import type {
   AirQualityMeasurement,
   AirQualityFilter,
-  OpenAQLatestResponse,
   Coordinates,
 } from '@/types/air-quality';
 
-const OPENAQ_BASE_URL = 'https://api.openaq.org/v2';
+const OPENAQ_BASE_URL = 'https://api.openaq.org/v3';
 
 /**
  * Calculate AQI from PM2.5 value using US EPA standards
@@ -40,18 +39,32 @@ function calculateAQIFromPM25(pm25: number): number {
 }
 
 /**
- * Transform OpenAQ API response to AirQualityMeasurement
- * @param result - Single result from OpenAQ API
- * @returns Transformed AirQualityMeasurement
+ * Transform OpenAQ v3 location to AirQualityMeasurement
  */
-function transformOpenAQResult(
-  result: OpenAQLatestResponse['results'][0]
-): AirQualityMeasurement {
-  const coordinates: Coordinates = [
-    result.coordinates.latitude,
-    result.coordinates.longitude,
-  ];
+function transformLocation(location: {
+  id: string;
+  name: string;
+  locality?: string;
+  timezone?: string;
+  country?: { id: string; name: string };
+  owner?: { id: string; name: string };
+  coordinates?: { lat: number; lon: number };
+  sensors?: Array<{
+    id: string;
+    name: string;
+    parameter?: { id: string; name: string; units: string };
+    latest?: {
+      datetime: string;
+      value: number;
+    };
+  }>;
+}): AirQualityMeasurement | null {
+  if (!location.coordinates || !location.sensors) {
+    return null;
+  }
 
+  const coordinates: Coordinates = [location.coordinates.lat, location.coordinates.lon];
+  
   let aqi = 0;
   let pm25: number | null = null;
   let pm10: number | null = null;
@@ -59,37 +72,56 @@ function transformOpenAQResult(
   let no2: number | null = null;
   let so2: number | null = null;
   let co: number | null = null;
+  let latestTimestamp = new Date().toISOString();
 
-  switch (result.parameter.toLowerCase()) {
-    case 'pm25':
-    case 'pm2.5':
-      pm25 = result.value;
-      aqi = calculateAQIFromPM25(result.value);
-      break;
-    case 'pm10':
-      pm10 = result.value;
-      break;
-    case 'o3':
-      o3 = result.value;
-      break;
-    case 'no2':
-      no2 = result.value;
-      break;
-    case 'so2':
-      so2 = result.value;
-      break;
-    case 'co':
-      co = result.value;
-      break;
+  // Process sensors
+  for (const sensor of location.sensors) {
+    if (!sensor.latest) continue;
+    
+    const paramName = sensor.parameter?.name?.toLowerCase() ?? '';
+    const value = sensor.latest.value;
+    latestTimestamp = sensor.latest.datetime;
+
+    switch (paramName) {
+      case 'pm25':
+      case 'pm2.5':
+        pm25 = value;
+        aqi = calculateAQIFromPM25(value);
+        break;
+      case 'pm10':
+        pm10 = value;
+        break;
+      case 'o3':
+      case 'ozone':
+        o3 = value;
+        break;
+      case 'no2':
+      case 'nitrogen dioxide':
+        no2 = value;
+        break;
+      case 'so2':
+      case 'sulfur dioxide':
+        so2 = value;
+        break;
+      case 'co':
+      case 'carbon monoxide':
+        co = value;
+        break;
+    }
+  }
+
+  // Only return if we have at least one measurement
+  if (pm25 === null && pm10 === null && o3 === null && no2 === null && so2 === null && co === null) {
+    return null;
   }
 
   return {
-    locationId: result.locationId,
-    locationName: result.location,
+    locationId: location.id,
+    locationName: location.name,
     coordinates,
-    city: result.city,
-    country: result.country,
-    timestamp: result.date.utc,
+    city: location.locality ?? location.owner?.name ?? 'Unknown',
+    country: location.country?.name ?? 'Unknown',
+    timestamp: latestTimestamp,
     aqi,
     pm25,
     pm10,
@@ -101,7 +133,7 @@ function transformOpenAQResult(
 }
 
 /**
- * Fetch latest air quality measurements from OpenAQ
+ * Fetch latest air quality measurements from OpenAQ v3
  * @param filter - Optional filter parameters
  * @returns Array of air quality measurements
  * @throws Error if API request fails
@@ -110,29 +142,31 @@ export async function fetchLatestAirQuality(
   filter: AirQualityFilter = {}
 ): Promise<AirQualityMeasurement[]> {
   const params = new URLSearchParams();
-  params.append('limit', String(filter.limit ?? 100));
+  params.append('limit', String(filter.limit ?? 50));
+  params.append('sensors', 'true');
   
   if (filter.country) {
-    params.append('country', filter.country);
+    params.append('countries_id', filter.country);
   }
   if (filter.city) {
-    params.append('city', filter.city);
-  }
-  if (filter.parameter) {
-    params.append('parameter', filter.parameter);
+    params.append('locality', filter.city);
   }
 
-  const url = `${OPENAQ_BASE_URL}/latest?${params.toString()}`;
+  const url = `${OPENAQ_BASE_URL}/locations?${params.toString()}`;
   
-  const response = await fetch(url);
+  const response = await fetch(url, {
+    headers: { 'Accept': 'application/json' },
+  });
   
   if (!response.ok) {
     throw new Error(`OpenAQ API error: ${response.status} ${response.statusText}`);
   }
 
-  const data: OpenAQLatestResponse = await response.json();
+  const data = await response.json();
   
-  return data.results.map(transformOpenAQResult);
+  return (data.results ?? [])
+    .map(transformLocation)
+    .filter((m: AirQualityMeasurement | null): m is AirQualityMeasurement => m !== null);
 }
 
 /**
@@ -151,22 +185,25 @@ export async function fetchAirQualityByLocation(
   params.append('coordinates', `${latitude},${longitude}`);
   params.append('radius', String(radius));
   params.append('limit', '1');
+  params.append('sensors', 'true');
 
-  const url = `${OPENAQ_BASE_URL}/latest?${params.toString()}`;
+  const url = `${OPENAQ_BASE_URL}/locations?${params.toString()}`;
   
-  const response = await fetch(url);
+  const response = await fetch(url, {
+    headers: { 'Accept': 'application/json' },
+  });
   
   if (!response.ok) {
     throw new Error(`OpenAQ API error: ${response.status} ${response.statusText}`);
   }
 
-  const data: OpenAQLatestResponse = await response.json();
+  const data = await response.json();
   
-  if (data.results.length === 0) {
+  if (!data.results || data.results.length === 0) {
     return null;
   }
 
-  return transformOpenAQResult(data.results[0]);
+  return transformLocation(data.results[0]);
 }
 
 /**
