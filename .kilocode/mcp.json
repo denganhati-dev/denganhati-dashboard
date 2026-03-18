@@ -1,0 +1,134 @@
+{
+    "mcpServers": {
+        "browsermcp": {
+            "command": "npx",
+            "args": [
+                "-y",
+                "@browsermcp/mcp@latest"
+            ],
+            "alwaysAllow": [
+                "browser_navigate",
+                "browser_snapshot",
+                "browser_click",
+                "browser_type",
+                "browser_select_option",
+                "browser_press_key",
+                "browser_go_back",
+                "browser_go_forward",
+                "browser_wait",
+                "browser_get_console_logs",
+                "browser_screenshot"
+            ],
+            "disabled": false,
+            "description": "Web research, official documentation, library research"
+        },
+        "sequential-thinking": {
+            "command": "npx",
+            "args": [
+                "-y",
+                "@modelcontextprotocol/server-sequential-thinking@latest"
+            ],
+            "alwaysAllow": [
+                "sequentialthinking"
+            ],
+            "disabled": false,
+            "description": "Complex option analysis, multi-step problem decomposition"
+        },
+        "deepwiki": {
+            "type": "streamable-http",
+            "url": "https://mcp.deepwiki.com/mcp",
+            "alwaysAllow": [
+                "ask_question",
+                "read_wiki_contents",
+                "read_wiki_structure"
+            ],
+            "disabled": false,
+            "description": "Research GitHub repositories and open-source documentation"
+        }
+    },
+    "modelProviders": {
+        "openSource": {
+            "qwen": {
+                "enabled": true,
+                "baseUrl": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+                "models": [
+                    "qwen-coder",
+                    "qwen-plus",
+                    "qwen-max",
+                    "qwen-turbo"
+                ],
+                "description": "Alibaba Qwen — code generation & debugging"
+            },
+            "glm": {
+                "enabled": true,
+                "baseUrl": "https://api.z.ai/api/paas/v4",
+                "models": [
+                    "glm-4",
+                    "glm-4-flash",
+                    "glm-4-air"
+                ],
+                "description": "Zhipu GLM — testing & documentation"
+            },
+            "kimi": {
+                "enabled": true,
+                "baseUrl": "https://api.moonshot.cn/v1",
+                "models": [
+                    "moonshot-v1-8k",
+                    "moonshot-v1-32k",
+                    "moonshot-v1-128k"
+                ],
+                "description": "Moonshot Kimi — architecture design & long-context research"
+            },
+            "minimax": {
+                "enabled": true,
+                "baseUrl": "https://api.minimax.chat/v1",
+                "models": [
+                    "abab6.5-chat",
+                    "abab6.5s-chat"
+                ],
+                "description": "MiniMax — general purpose fallback"
+            }
+        },
+        "defaultModel": "qwen-coder",
+        "fallbackModel": "glm-4-flash"
+    },
+    "modelRouting": {
+        "rules": [
+            {
+                "pattern": "code.*|implement.*|create.*file|write.*function|refactor.*",
+                "model": "qwen-coder",
+                "description": "Code generation — Qwen Coder"
+            },
+            {
+                "pattern": "debug.*|fix.*|error.*|bug.*|traceback.*",
+                "model": "qwen-plus",
+                "description": "Debugging — Qwen Plus (strong reasoning)"
+            },
+            {
+                "pattern": "design.*|architect.*|plan.*|module.*tree|brainstorm.*",
+                "model": "moonshot-v1-32k",
+                "description": "Architecture & design — Kimi (long context)"
+            },
+            {
+                "pattern": "research.*|docs.*|documentation.*|unfamiliar.*",
+                "model": "moonshot-v1-128k",
+                "description": "Research tasks — Kimi (128k context)"
+            },
+            {
+                "pattern": "test.*|testing.*|unit.*test|coverage.*|v-model.*",
+                "model": "glm-4",
+                "description": "Test generation — GLM-4"
+            },
+            {
+                "pattern": "docstring.*|jsdoc.*|phpdoc.*|document.*function",
+                "model": "glm-4-flash",
+                "description": "Documentation generation — GLM-4 Flash (fast)"
+            },
+            {
+                "pattern": "changelog.*|release.*|version.*",
+                "model": "glm-4-flash",
+                "description": "Changelog — GLM-4 Flash"
+            }
+        ]
+    }
+}
