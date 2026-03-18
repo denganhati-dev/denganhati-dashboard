@@ -1,36 +1,141 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Dengan Hati Dashboard
 
-## Getting Started
+[![Next.js](https://img.shields.io/badge/Next.js-14-black)](https://nextjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue)](https://www.typescriptlang.org/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind-3.0-38B2AC)](https://tailwindcss.com/)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-First, run the development server:
+Dashboard visualisasi data lingkungan interaktif untuk portofolio [denganhati.com](https://denganhati.com). Menyediakan data kualitas udara dan cuaca real-time untuk referensi media dan NGO.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## 🌟 Fitur
+
+- **🗺️ Peta Interaktif** - Visualisasi kualitas udara dengan marker berwarna berdasarkan AQI
+- **📊 Grafik Time Series** - Prakiraan suhu dan tren data lingkungan
+- **🌤️ Data Cuaca** - Informasi cuaca real-time dari Open-Meteo
+- **💨 Kualitas Udara** - Data AQI, PM2.5, PM10, O3 dari OpenAQ
+- **📱 Responsive Design** - Optimized untuk desktop dan mobile
+- **⚡ Caching** - 5-10 menit cache untuk performa optimal
+
+## 🚀 Tech Stack
+
+| Kategori | Teknologi |
+|----------|-----------|
+| Framework | Next.js 14 (App Router) |
+| Language | TypeScript |
+| Styling | Tailwind CSS |
+| Charts | Recharts |
+| Maps | Leaflet + React-Leaflet |
+| API | OpenAQ, Open-Meteo |
+
+## 📁 Struktur Proyek
+
+```
+src/
+├── app/
+│   ├── api/
+│   │   ├── air-quality/     # Proxy API untuk OpenAQ
+│   │   └── weather/         # Proxy API untuk Open-Meteo
+│   ├── dashboard/           # Halaman dashboard utama
+│   ├── layout.tsx          # Root layout
+│   └── page.tsx            # Landing page
+├── components/
+│   ├── maps/               # Komponen peta
+│   │   └── MapContainer.tsx
+│   └── charts/             # Komponen grafik
+│       └── TimeSeriesChart.tsx
+├── lib/
+│   └── api/                # API clients
+│       ├── openaq.ts       # OpenAQ integration
+│       └── openmeteo.ts    # Open-Meteo integration
+└── types/                  # TypeScript definitions
+    ├── air-quality.ts
+    └── weather.ts
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 🛠️ Instalasi
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Prerequisites
+- Node.js 18+
+- npm atau yarn
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Setup
 
-## Learn More
+1. Clone repository:
+```bash
+git clone https://github.com/denganhati-dev/denganhati-dashboard.git
+cd denganhati-dashboard
+```
 
-To learn more about Next.js, take a look at the following resources:
+2. Install dependencies:
+```bash
+npm install
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+3. Jalankan development server:
+```bash
+npm run dev
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+4. Buka [http://localhost:3000/dashboard](http://localhost:3000/dashboard)
 
-## Deploy on Vercel
+## 🔌 API Endpoints
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Air Quality
+```
+GET /api/air-quality?country=ID&city=Jakarta&limit=50
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### Weather
+```
+GET /api/weather?lat=-6.2088&lon=106.8456&days=7
+```
+
+## 📊 Data Sources
+
+| Data | Source | Update Frequency |
+|------|--------|------------------|
+| Air Quality | [OpenAQ](https://openaq.org/) | Real-time |
+| Weather | [Open-Meteo](https://open-meteo.com/) | Hourly |
+
+## 🎨 AQI Color Reference
+
+| AQI | Category | Color |
+|-----|----------|-------|
+| 0-50 | Good | 🟢 Green |
+| 51-100 | Moderate | 🟡 Yellow |
+| 101-150 | Unhealthy for Sensitive | 🟠 Orange |
+| 151-200 | Unhealthy | 🔴 Red |
+| 201-300 | Very Unhealthy | 🟣 Purple |
+| 300+ | Hazardous | 🟤 Maroon |
+
+## 📝 Scripts
+
+```bash
+npm run dev      # Development server
+npm run build    # Production build
+npm run start    # Production server
+npm run lint     # ESLint check
+```
+
+## 🤝 Contributing
+
+1. Fork repository
+2. Buat feature branch: `git checkout -b feature/nama-fitur`
+3. Commit perubahan: `git commit -m 'feat: deskripsi fitur'`
+4. Push ke branch: `git push origin feature/nama-fitur`
+5. Buat Pull Request
+
+## 📄 License
+
+MIT License - lihat [LICENSE](LICENSE) untuk detail.
+
+## 🙏 Acknowledgments
+
+- [OpenAQ](https://openaq.org/) - Data kualitas udara global
+- [Open-Meteo](https://open-meteo.com/) - API cuaca gratis
+- [Leaflet](https://leafletjs.com/) - Library peta interaktif
+- [Recharts](https://recharts.org/) - Library grafik React
+
+---
+
+Dibuat dengan ❤️ oleh [Dengan Hati Team](https://denganhati.com)
