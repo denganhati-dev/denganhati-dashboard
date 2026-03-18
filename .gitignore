@@ -1,0 +1,29 @@
+# Task Manager
+tasks.db
+tasks-backup-*.json
+.kilocode/task_manager/task
+.kilocode/task_manager/task.exe
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+dist/
+*.egg-info/
+
+# JavaScript / TypeScript
+node_modules/
+dist/
+.next/
+.nuxt/
+
+# PHP
+vendor/
+.env
+
+# General
+.DS_Store
+*.log
+.env
+.env.local
